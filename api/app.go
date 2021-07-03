@@ -25,7 +25,8 @@ func main() {
 		return ctx.Send([]byte("WageTrak API"))
 	})
 
-	currencySvc := currency.NewCurrencyService()
+	currencyClient := currency.Client{}
+	currencySvc := currency.NewCurrencyService(currencyClient)
 
 	currencyV1 := app.Group("/currency/v1")
 	routesV1.CurrencyRouterV1(currencyV1, currencySvc)

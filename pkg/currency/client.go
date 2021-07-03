@@ -23,16 +23,23 @@ type innerCube struct {
 	Currencies []entities.EuroExchangeRate `xml:"Cube"`
 }
 
-func GetEuroExchangeRates() (entities.EuroExchangeRates, error) {
-	client := fiber.Client{}
-	resp := client.Get(euroFxUrl)
+type Client struct {
+	HttpClient  *fiber.Client
+	CachedRates *entities.EuroExchangeRates
+}
+
+func (c *Client) fetchEuroExchangeRates() (entities.EuroExchangeRates, error) {
+	if c.HttpClient == nil {
+		c.HttpClient = &fiber.Client{}
+	}
+
+	resp := c.HttpClient.Get(euroFxUrl)
 	stat, body, errs := resp.String()
 	if errs != nil {
 		return entities.EuroExchangeRates{}, errs[0]
 	}
 
 	if stat == 200 {
-		//log.Println(body)
 		var envelope envelope
 		err := xml.Unmarshal([]byte(body), &envelope)
 		if err != nil {
@@ -46,11 +53,27 @@ func GetEuroExchangeRates() (entities.EuroExchangeRates, error) {
 		}
 
 		return entities.EuroExchangeRates{
-			Updated: t,
-			LastChecked: time.Now(),
-			Currencies: envelope.Cube.Cube.Currencies,
+			Updated:       t,
+			LastRefreshed: time.Now(),
+			Currencies:    envelope.Cube.Cube.Currencies,
 		}, nil
 
 	}
 	return entities.EuroExchangeRates{}, fmt.Errorf("error while fetching exchange rates")
+}
+
+func (c *Client) GetEuroExchangeRates() (entities.EuroExchangeRates, error) {
+	// If cache is empty
+	if c.CachedRates == nil {
+		rates, err := c.fetchEuroExchangeRates()
+		if err != nil {
+			return rates, err
+		}
+
+		c.CachedRates = &rates
+	}
+
+	// TODO: Check last refreshed
+
+	return *c.CachedRates, nil
 }

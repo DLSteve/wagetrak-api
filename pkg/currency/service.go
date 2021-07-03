@@ -45,17 +45,19 @@ type Service interface {
 }
 
 type service struct {
-
+	client Client
 }
 
-func NewCurrencyService() Service {
-	return &service{}
+func NewCurrencyService(client Client) Service {
+	return &service{
+		client,
+	}
 }
 
 func (s *service) GetCurrencyList() ([]entities.Currency, error) {
 	var curList []entities.Currency
 
-	rates, err := GetEuroExchangeRates()
+	rates, err := s.client.GetEuroExchangeRates()
 	if err != nil {
 		return curList, err
 	}

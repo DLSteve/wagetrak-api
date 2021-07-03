@@ -15,7 +15,7 @@ type EuroExchangeRate struct {
 }
 
 type EuroExchangeRates struct {
-	Updated     time.Time
-	LastChecked time.Time
-	Currencies  []EuroExchangeRate
+	Updated       time.Time
+	LastRefreshed time.Time
+	Currencies    []EuroExchangeRate
 }
