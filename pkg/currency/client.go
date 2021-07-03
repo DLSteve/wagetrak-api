@@ -2,8 +2,10 @@ package currency
 
 import (
 	"encoding/xml"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"log"
+	"time"
+	"wagetrak-api/pkg/entities"
 )
 
 const euroFxUrl = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
@@ -17,21 +19,16 @@ type outerCube struct {
 }
 
 type innerCube struct {
-	Time       string     `xml:"time,attr"`
-	Currencies []currency `xml:"Cube"`
+	Time       string                      `xml:"time,attr"`
+	Currencies []entities.EuroExchangeRate `xml:"Cube"`
 }
 
-type currency struct {
-	Currency string  `xml:"currency,attr"`
-	Rate     float32 `xml:"rate,attr"`
-}
-
-func GetExchangeRates() error {
+func GetEuroExchangeRates() (entities.EuroExchangeRates, error) {
 	client := fiber.Client{}
 	resp := client.Get(euroFxUrl)
 	stat, body, errs := resp.String()
 	if errs != nil {
-		return errs[0]
+		return entities.EuroExchangeRates{}, errs[0]
 	}
 
 	if stat == 200 {
@@ -39,10 +36,21 @@ func GetExchangeRates() error {
 		var envelope envelope
 		err := xml.Unmarshal([]byte(body), &envelope)
 		if err != nil {
-			log.Println(err)
-			return err
+			return entities.EuroExchangeRates{}, err
 		}
-		log.Println(envelope.Cube.Cube.Currencies[0])
+
+		layout := "2006-07-02"
+		t, err := time.Parse(layout, envelope.Cube.Cube.Time)
+		if err != nil {
+			return entities.EuroExchangeRates{}, err
+		}
+
+		return entities.EuroExchangeRates{
+			Updated: t,
+			LastChecked: time.Now(),
+			Currencies: envelope.Cube.Cube.Currencies,
+		}, nil
+
 	}
-	return nil
+	return entities.EuroExchangeRates{}, fmt.Errorf("error while fetching exchange rates")
 }

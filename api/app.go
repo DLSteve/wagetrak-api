@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 	routesV1 "wagetrak-api/api/routes/v1"
+	"wagetrak-api/pkg/currency"
 )
 
 func main() {
@@ -24,8 +25,10 @@ func main() {
 		return ctx.Send([]byte("WageTrak API"))
 	})
 
+	currencySvc := currency.NewCurrencyService()
+
 	currencyV1 := app.Group("/currency/v1")
-	routesV1.CurrencyRouterV1(currencyV1)
+	routesV1.CurrencyRouterV1(currencyV1, currencySvc)
 
 	errs := make(chan error)
 	go func() {

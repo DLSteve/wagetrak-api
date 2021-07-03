@@ -7,18 +7,20 @@ import (
 	"wagetrak-api/pkg/currency"
 )
 
-func CurrencyRouterV1(app fiber.Router) {
-	app.Get("/exchange", getExchangeList())
+func CurrencyRouterV1(app fiber.Router, service currency.Service) {
+	app.Get("/exchange", getExchangeList(service))
 	app.Get("/exchange/:base", getExchangeRates())
 	app.Get("/exchange/:base/:target", getExchangeRate())
 }
 
-func getExchangeList() fiber.Handler {
+func getExchangeList(service currency.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		_ = currency.GetExchangeRates()
-		return c.JSON(&fiber.Map{
-			"base": strings.ToUpper(c.Params("base")),
-		})
+		curList, err := service.GetCurrencyList()
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(curList)
 	}
 }
 
