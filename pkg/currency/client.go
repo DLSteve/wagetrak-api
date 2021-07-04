@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/zap"
+	"sync"
 	"time"
 	"wagetrak-api/pkg/entities"
 )
@@ -24,8 +26,10 @@ type innerCube struct {
 }
 
 type Client struct {
+	mu          sync.Mutex
+	cachedRates *entities.EuroExchangeRates
+	Logger      *zap.SugaredLogger
 	HttpClient  *fiber.Client
-	CachedRates *entities.EuroExchangeRates
 }
 
 func (c *Client) fetchEuroExchangeRates() (entities.EuroExchangeRates, error) {
@@ -62,18 +66,35 @@ func (c *Client) fetchEuroExchangeRates() (entities.EuroExchangeRates, error) {
 	return entities.EuroExchangeRates{}, fmt.Errorf("error while fetching exchange rates")
 }
 
+func needsRefresh(updated, lastRefresh, now time.Time) bool {
+	if updated.Format("2006-01-02") == now.Format("2006-01-02") {
+		return false
+	}
+
+	diff := now.Sub(lastRefresh)
+
+	if diff.Hours() < 2 {
+		return false
+	}
+
+	return true
+}
+
 func (c *Client) GetEuroExchangeRates() (entities.EuroExchangeRates, error) {
 	// If cache is empty
-	if c.CachedRates == nil {
+	if c.cachedRates == nil || needsRefresh(c.cachedRates.Updated, c.cachedRates.LastRefreshed, time.Now()) {
+		c.Logger.Info("msg", "Refreshing exchange rates cache")
 		rates, err := c.fetchEuroExchangeRates()
 		if err != nil {
 			return rates, err
 		}
 
-		c.CachedRates = &rates
+		c.mu.Lock()
+		c.cachedRates = &rates
+		c.mu.Unlock()
+	} else {
+		c.Logger.Debug("msg", "Exchange rates cache hit")
 	}
 
-	// TODO: Check last refreshed
-
-	return *c.CachedRates, nil
+	return *c.cachedRates, nil
 }

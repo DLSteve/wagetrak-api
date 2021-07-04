@@ -45,10 +45,10 @@ type Service interface {
 }
 
 type service struct {
-	client Client
+	client *Client
 }
 
-func NewCurrencyService(client Client) Service {
+func NewCurrencyService(client *Client) Service {
 	return &service{
 		client,
 	}
