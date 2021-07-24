@@ -1,6 +1,10 @@
 package currency
 
-import "wagetrak-api/pkg/entities"
+import (
+	"fmt"
+	"strings"
+	"wagetrak-api/pkg/entities"
+)
 
 var currencyDesc = map[string]string{
 	"USD": "United States Dollar",
@@ -40,7 +44,7 @@ var currencyDesc = map[string]string{
 
 type Service interface {
 	GetCurrencyList() ([]entities.Currency, error)
-	GetExchangeRates(base string) error
+	GetExchangeRates(base string) (entities.Rates, error)
 	GetExchangeRate(base, target string) error
 }
 
@@ -82,8 +86,54 @@ func (s *service) GetCurrencyList() ([]entities.Currency, error) {
 	return curList, nil
 }
 
-func (s *service) GetExchangeRates(base string) error {
-	return nil
+func (s *service) GetExchangeRates(base string) (entities.Rates, error) {
+	base = strings.ToUpper(base)
+	euroRates, err := s.client.GetEuroExchangeRates()
+	if err != nil {
+		return entities.Rates{}, err
+	}
+
+	rates := entities.Rates{
+		Updated: euroRates.Updated,
+	}
+
+	curList := make(map[string]entities.Currency)
+	var euroExchMap = make(map[string]float32)
+
+	for _, c := range euroRates.Currencies {
+		euroExchMap[strings.ToUpper(c.Currency)] = c.Rate
+	}
+
+	baseEx, ok := euroExchMap[base]
+	if !ok {
+		return rates, fmt.Errorf("no exchange rate found for provided base currency")
+	}
+
+	for _, c := range euroRates.Currencies {
+		if desc, ok := currencyDesc[c.Currency]; ok {
+			if "EUR" == base {
+				curList[c.Currency] = entities.Currency{
+					Name: desc,
+					Rate: c.Rate,
+				}
+			} else if c.Currency == base {
+				eurDesc := currencyDesc["EUR"]
+				curList["EUR"] = entities.Currency{
+					Name: eurDesc,
+					Rate: 1 / c.Rate,
+				}
+			} else {
+				curList[c.Currency] = entities.Currency{
+					Name: desc,
+					Rate: CalculateExchangeFromBase(baseEx, c.Rate),
+				}
+			}
+		}
+	}
+
+	rates.Rates = curList
+
+	return rates, nil
 }
 
 func (s *service) GetExchangeRate(base, target string) error {

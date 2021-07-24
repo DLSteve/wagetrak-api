@@ -9,8 +9,8 @@ import (
 
 func CurrencyRouterV1(app fiber.Router, service currency.Service) {
 	app.Get("/exchange", getExchangeList(service))
-	app.Get("/exchange/:base", getExchangeRates())
-	app.Get("/exchange/:base/:target", getExchangeRate())
+	app.Get("/exchange/:base", getExchangeRates(service))
+	app.Get("/exchange/:base/:target", getExchangeRate(service))
 }
 
 func getExchangeList(service currency.Service) fiber.Handler {
@@ -24,15 +24,18 @@ func getExchangeList(service currency.Service) fiber.Handler {
 	}
 }
 
-func getExchangeRates() fiber.Handler {
+func getExchangeRates(service currency.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		return c.JSON(&fiber.Map{
-			"base": strings.ToUpper(c.Params("base")),
-		})
+		base := c.Params("base")
+		rates, err := service.GetExchangeRates(base)
+		if err != nil {
+			return err
+		}
+		return c.JSON(rates)
 	}
 }
 
-func getExchangeRate() fiber.Handler {
+func getExchangeRate(service currency.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		return c.JSON(&fiber.Map{
 			"base": strings.ToUpper(c.Params("base")),

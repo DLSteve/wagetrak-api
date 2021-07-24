@@ -5,8 +5,15 @@ import (
 )
 
 type Currency struct {
-	Code string `json:"code"`
-	Name string `json:"name"`
+	Code    string     `json:"code,omitempty"`
+	Name    string     `json:"name"`
+	Rate    float32    `json:"rate,omitempty"`
+	Updated *time.Time `json:"updated,omitempty"`
+}
+
+type Rates struct {
+	Updated time.Time           `json:"updated"`
+	Rates   map[string]Currency `json:"rates"`
 }
 
 type EuroExchangeRate struct {
