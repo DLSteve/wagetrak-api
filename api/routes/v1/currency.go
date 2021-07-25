@@ -2,9 +2,8 @@ package v1
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"strings"
-
 	"wagetrak-api/pkg/currency"
+	"wagetrak-api/pkg/entities"
 )
 
 func CurrencyRouterV1(app fiber.Router, service currency.Service) {
@@ -29,6 +28,9 @@ func getExchangeRates(service currency.Service) fiber.Handler {
 		base := c.Params("base")
 		rates, err := service.GetExchangeRates(base)
 		if err != nil {
+			if err == entities.ErrCurrencyNotFound {
+				return fiber.NewError(fiber.StatusNotFound, "Provided currency code is not valid or not supported.")
+			}
 			return err
 		}
 		return c.JSON(rates)
@@ -37,9 +39,16 @@ func getExchangeRates(service currency.Service) fiber.Handler {
 
 func getExchangeRate(service currency.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		return c.JSON(&fiber.Map{
-			"base": strings.ToUpper(c.Params("base")),
-			"target": strings.ToUpper(c.Params("target")),
-		})
+		base := c.Params("base")
+		target := c.Params("target")
+
+		rate, err := service.GetExchangeRate(base, target)
+		if err != nil {
+			if err == entities.ErrCurrencyNotFound {
+				return fiber.NewError(fiber.StatusNotFound, "Provided currency code is not valid or not supported.")
+			}
+			return err
+		}
+		return c.JSON(rate)
 	}
 }

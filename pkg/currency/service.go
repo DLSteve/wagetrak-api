@@ -1,7 +1,6 @@
 package currency
 
 import (
-	"fmt"
 	"strings"
 	"wagetrak-api/pkg/entities"
 )
@@ -45,7 +44,7 @@ var currencyDesc = map[string]string{
 type Service interface {
 	GetCurrencyList() ([]entities.Currency, error)
 	GetExchangeRates(base string) (entities.Rates, error)
-	GetExchangeRate(base, target string) error
+	GetExchangeRate(base, target string) (entities.Currency, error)
 }
 
 type service struct {
@@ -98,35 +97,32 @@ func (s *service) GetExchangeRates(base string) (entities.Rates, error) {
 	}
 
 	curList := make(map[string]entities.Currency)
-	var euroExchMap = make(map[string]float32)
+	euroExMap := getEuroExchangeMap(euroRates)
 
-	for _, c := range euroRates.Currencies {
-		euroExchMap[strings.ToUpper(c.Currency)] = c.Rate
-	}
-
-	baseEx, ok := euroExchMap[base]
-	if !ok {
-		return rates, fmt.Errorf("no exchange rate found for provided base currency")
+	baseEx, ok := euroExMap[base]
+	if !ok && base == "EUR" {
+		baseEx = 1.0
+	} else if !ok {
+		return rates, entities.ErrCurrencyNotFound
 	}
 
 	for _, c := range euroRates.Currencies {
 		if desc, ok := currencyDesc[c.Currency]; ok {
-			if "EUR" == base {
-				curList[c.Currency] = entities.Currency{
-					Name: desc,
-					Rate: c.Rate,
-				}
-			} else if c.Currency == base {
-				eurDesc := currencyDesc["EUR"]
-				curList["EUR"] = entities.Currency{
-					Name: eurDesc,
-					Rate: 1 / c.Rate,
-				}
-			} else {
+			if base != c.Currency {
 				curList[c.Currency] = entities.Currency{
 					Name: desc,
 					Rate: CalculateExchangeFromBase(baseEx, c.Rate),
 				}
+			}
+		}
+	}
+
+	// Adds Euro to the list
+	if base != "EUR" {
+		if desc, ok := currencyDesc["EUR"]; ok {
+			curList["EUR"] = entities.Currency{
+				Name: desc,
+				Rate: CalculateExchangeFromBase(baseEx, 1.0),
 			}
 		}
 	}
@@ -136,6 +132,55 @@ func (s *service) GetExchangeRates(base string) (entities.Rates, error) {
 	return rates, nil
 }
 
-func (s *service) GetExchangeRate(base, target string) error {
-	return nil
+func (s *service) GetExchangeRate(base, target string) (entities.Currency, error) {
+	base = strings.ToUpper(base)
+	target = strings.ToUpper(target)
+
+	currency := entities.Currency{}
+
+	euroRates, err := s.client.GetEuroExchangeRates()
+	if err != nil {
+		return currency, err
+	}
+
+	currency.Updated = &euroRates.Updated
+
+	euroExMap := getEuroExchangeMap(euroRates)
+
+	baseEx, ok := euroExMap[base]
+	if !ok && base == "EUR" {
+		baseEx = 1.0
+	} else if !ok {
+		return currency, entities.ErrCurrencyNotFound
+	}
+
+	targetEx, ok := euroExMap[target]
+	if !ok && target == "EUR" {
+		targetEx = 1.0
+	} else if !ok {
+		return currency, entities.ErrCurrencyNotFound
+	}
+
+	if desc, ok := currencyDesc[target]; ok {
+		if base == target {
+			currency.Code = target
+			currency.Name = desc
+			currency.Rate = 1.0
+		} else {
+			currency.Code = target
+			currency.Name = desc
+			currency.Rate = CalculateExchangeFromBase(baseEx, targetEx)
+		}
+	}
+
+	return currency, err
+}
+
+func getEuroExchangeMap(rates entities.EuroExchangeRates) map[string]float32 {
+	var euroMap = make(map[string]float32)
+	for _, c := range rates.Currencies {
+		euroMap[strings.ToUpper(c.Currency)] = c.Rate
+	}
+
+	return euroMap
 }
