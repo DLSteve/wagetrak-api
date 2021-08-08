@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 	routesV1 "wagetrak-api/api/routes/v1"
+	_ "wagetrak-api/pkg/config"
 	"wagetrak-api/pkg/currency"
 	"wagetrak-api/pkg/utils"
 )
